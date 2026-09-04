@@ -7,7 +7,7 @@
 <meta name="description" content="A cute list tracker for assignments, schedule, and recaps." />
 <meta name="theme-color" content="#FF8FAB" />
 <link rel="manifest" href="manifest.json" />
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -309,9 +309,62 @@
     <p class="confirm-sub" id="confirmSub">This can't be undone.</p>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close-modal>nevermind</button>
-      <button type="button" class="btn btn-danger" id="btnConfirmDelete">
+      <button type="button" class="btn btn-danger" id="btnConfirmAction">
         <i data-lucide="trash-2"></i>
         <span>delete</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VIEW ITEM MODAL (assignment / recap detail) ============ -->
+<div id="modalView" class="modal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title" id="viewTitle"></h2>
+    <div class="item-meta" id="viewMeta"></div>
+    <img id="viewImage" class="view-image" hidden alt="" />
+    <p class="view-desc" id="viewDesc"></p>
+    <div class="modal-actions" id="viewActions">
+      <button type="button" class="btn btn-ghost" data-close-modal>close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHARE MODAL ============ -->
+<div id="modalShare" class="modal" hidden>
+  <div class="modal-sheet modal-sheet-sm">
+    <div class="modal-handle"></div>
+    <div class="mascot" aria-hidden="true">
+      <svg viewBox="0 0 200 200" class="mascot-svg mascot-svg-sm">
+        <ellipse cx="100" cy="178" rx="46" ry="8" class="mascot-shadow"/>
+        <g class="mascot-bob">
+          <circle cx="100" cy="100" r="70" class="mascot-body"/>
+          <g class="mascot-ear mascot-ear-l"><circle cx="52" cy="46" r="20"/></g>
+          <g class="mascot-ear mascot-ear-r"><circle cx="148" cy="46" r="20"/></g>
+          <circle cx="52" cy="46" r="11" class="mascot-ear-inner"/>
+          <circle cx="148" cy="46" r="11" class="mascot-ear-inner"/>
+          <g class="mascot-eyes">
+            <ellipse cx="76" cy="102" rx="7" ry="10" class="mascot-eye"/>
+            <ellipse cx="124" cy="102" rx="7" ry="10" class="mascot-eye"/>
+          </g>
+          <circle cx="60" cy="122" r="10" class="mascot-blush"/>
+          <circle cx="140" cy="122" r="10" class="mascot-blush"/>
+          <path d="M88 128 Q100 138 112 128" class="mascot-mouth"/>
+        </g>
+      </svg>
+    </div>
+    <h2 class="modal-title" style="text-align:center;">share with your classmates!</h2>
+    <p class="confirm-sub" style="text-align:center;">so everyone's on the same page with deadlines and recaps.</p>
+    <button type="button" class="share-url-box" id="shareUrlBox">
+      <span id="shareUrlText">https://poppet1.vercel.app/</span>
+      <i data-lucide="copy"></i>
+    </button>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close-modal>maybe later</button>
+      <button type="button" class="btn btn-primary" id="btnShareNow">
+        <i data-lucide="share-2"></i>
+        <span>share</span>
       </button>
     </div>
   </div>

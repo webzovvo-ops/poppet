@@ -13,7 +13,7 @@
 const LS_SOUND_ENABLED = 'poppet_sound_enabled';
 const LS_ONBOARDED = 'poppet_onboarded';
 
-const CUTE_SOUND_SRC = 'assets/sounds/cutesounds.mp3';
+const CUTE_SOUND_SRC = 'cutesounds.mp3';
 
 /* ---------------- real audio file, with fallback ---------------- */
 

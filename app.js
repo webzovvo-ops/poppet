@@ -13,13 +13,17 @@ let recaps = [];
 let schedule = [];
 
 let pendingImage = { assignment: null, recap: null }; // File objects staged before save
-let pendingDelete = null; // { table, id, imagePath }
+let pendingConfirm = null; // { type: 'delete'|'done'|'undone', table, id }
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const CUSTOM_SUBJECT_VALUE = '__custom__';
+
+const SHARE_URL = 'https://poppet1.vercel.app/';
+const LS_SHARE_PROMPTED = 'poppet_share_prompted';
 
 // Seeded once, automatically, the first time the schedule table is empty —
 // so there's no manual SQL insert step. Table creation still needs to run
-// once in Supabase (see README), but this row data fills itself in.
+// once in Supabase (see schema.sql), but this row data fills itself in.
 const DEFAULT_SCHEDULE_SEED = [
   { code: 'NSTP 01', title: 'National Service Training Program 1 (LTS)', day_of_week: 'Monday', start_time: '08:00', end_time: '11:00', room: 'GYMNASIUM', professor: null },
   { code: 'PATHFIT 1', title: 'Physical Education (Movement Competency Training)', day_of_week: 'Monday', start_time: '11:00', end_time: '13:00', room: 'GYMNASIUM', professor: null },
@@ -32,8 +36,6 @@ const DEFAULT_SCHEDULE_SEED = [
   { code: 'PROFED 101', title: 'The Child and Adolescent Learners and Learning Principles', day_of_week: 'Saturday', start_time: '11:00', end_time: '14:00', room: '301', professor: null },
   { code: 'PCK 101', title: 'Facilitate Learner-Centered Teaching', day_of_week: 'Saturday', start_time: '17:00', end_time: '20:00', room: '403', professor: null },
 ];
-
-const CUSTOM_SUBJECT_VALUE = '__custom__';
 
 /* ============================================================
    dom refs
@@ -99,10 +101,22 @@ const el = {
   modalConfirm: $('modalConfirm'),
   confirmTitle: $('confirmTitle'),
   confirmSub: $('confirmSub'),
-  btnConfirmDelete: $('btnConfirmDelete'),
+  btnConfirmAction: $('btnConfirmAction'),
+
+  modalView: $('modalView'),
+  viewTitle: $('viewTitle'),
+  viewMeta: $('viewMeta'),
+  viewImage: $('viewImage'),
+  viewDesc: $('viewDesc'),
+
+  modalShare: $('modalShare'),
+  shareUrlBox: $('shareUrlBox'),
+  btnShareNow: $('btnShareNow'),
 
   toast: $('toast'),
 };
+
+const ALL_MODALS = () => [el.modalAssignment, el.modalRecap, el.modalSched, el.modalConfirm, el.modalView, el.modalShare];
 
 /* ============================================================
    init
@@ -124,6 +138,7 @@ async function startApp() {
   bindImagePickers();
   bindSubjectSelect();
   bindForms();
+  bindShare();
   await refreshAll();
 }
 
@@ -168,6 +183,8 @@ function switchTab(tab) {
   el.viewAssignment.hidden = tab !== 'assignment';
   el.viewSched.hidden = tab !== 'sched';
   el.viewRecap.hidden = tab !== 'recap';
+
+  if (tab === 'recap') maybeShowSharePrompt();
 }
 
 function bindSegments() {
@@ -190,7 +207,7 @@ function bindModals() {
   document.querySelectorAll('[data-close-modal]').forEach((btn) => {
     btn.addEventListener('click', () => closeAllModals());
   });
-  [el.modalAssignment, el.modalRecap, el.modalSched, el.modalConfirm].forEach((modal) => {
+  ALL_MODALS().forEach((modal) => {
     modal.addEventListener('click', (e) => { if (e.target === modal) closeAllModals(); });
   });
 }
@@ -201,7 +218,7 @@ function openModal(modal) {
 }
 
 function closeAllModals() {
-  [el.modalAssignment, el.modalRecap, el.modalSched, el.modalConfirm].forEach((m) => (m.hidden = true));
+  ALL_MODALS().forEach((m) => (m.hidden = true));
   resetAssignmentForm();
   resetRecapForm();
   el.formSched.reset();
@@ -346,8 +363,8 @@ function bindForms() {
     e.preventDefault();
     await saveSched();
   });
-  el.btnConfirmDelete.addEventListener('click', async () => {
-    await executeDelete();
+  el.btnConfirmAction.addEventListener('click', async () => {
+    await executeConfirm();
   });
 }
 
@@ -450,42 +467,155 @@ async function saveSched() {
 }
 
 /* ============================================================
-   delete flow (shared confirm modal)
+   confirm flow (shared by delete / mark done / restore)
    ============================================================ */
 
-function askDelete({ table, id, label }) {
-  pendingDelete = { table, id };
-  el.confirmTitle.textContent = `delete "${label}"?`;
-  el.confirmSub.textContent = "This can't be undone.";
+function askConfirm({ type, table, id, label }) {
+  pendingConfirm = { type, table, id };
+
+  if (type === 'delete') {
+    el.confirmTitle.textContent = `delete "${label}"?`;
+    el.confirmSub.textContent = "This can't be undone.";
+    el.btnConfirmAction.className = 'btn btn-danger';
+    el.btnConfirmAction.innerHTML = '<i data-lucide="trash-2"></i><span>delete</span>';
+  } else if (type === 'done') {
+    el.confirmTitle.textContent = `mark "${label}" as done?`;
+    el.confirmSub.textContent = 'This moves it to History.';
+    el.btnConfirmAction.className = 'btn btn-primary';
+    el.btnConfirmAction.innerHTML = '<i data-lucide="check"></i><span>mark done</span>';
+  } else if (type === 'undone') {
+    const item = assignments.find((a) => a.id === id);
+    const overdue = item?.due_date && new Date(item.due_date).getTime() <= Date.now();
+    el.confirmTitle.textContent = `move "${label}" back to active?`;
+    el.confirmSub.textContent = overdue
+      ? "Its due date already passed, so we'll bump it to tomorrow."
+      : "It'll no longer count as done.";
+    el.btnConfirmAction.className = 'btn btn-primary';
+    el.btnConfirmAction.innerHTML = '<i data-lucide="rotate-ccw"></i><span>restore</span>';
+  }
+
+  window.lucide?.createIcons();
   openModal(el.modalConfirm);
 }
 
-async function executeDelete() {
-  if (!pendingDelete) return;
-  const { table, id } = pendingDelete;
-  const { error } = await supabase.from(table).delete().eq('id', id);
-  pendingDelete = null;
+async function executeConfirm() {
+  if (!pendingConfirm) return;
+  const { type, table, id } = pendingConfirm;
+  pendingConfirm = null;
   closeAllModals();
-  if (error) { console.error(error); showToast("couldn't delete, try again", 'alert-circle'); return; }
 
-  showToast('deleted', 'trash-2');
-  if (table === 'assignments') { await loadAssignments(); renderAssignments(); }
-  else if (table === 'recaps') { await loadRecaps(); renderRecaps(); }
-  else if (table === 'schedule') { await loadSchedule(); renderSchedule(); }
+  if (type === 'delete') {
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) { console.error(error); showToast("couldn't delete, try again", 'alert-circle'); return; }
+    showToast('deleted', 'trash-2');
+    if (table === 'assignments') { await loadAssignments(); renderAssignments(); }
+    else if (table === 'recaps') { await loadRecaps(); renderRecaps(); }
+    else if (table === 'schedule') { await loadSchedule(); renderSchedule(); }
+  } else if (type === 'done') {
+    await performMarkDone(id);
+  } else if (type === 'undone') {
+    await performRestore(id);
+  }
 }
 
-/* ============================================================
-   mark assignment done -> moves to history immediately
-   ============================================================ */
-
-async function markDone(id) {
+async function performMarkDone(id) {
   const { error } = await supabase.from('assignments')
     .update({ status: 'history', moved_to_history_at: new Date().toISOString() })
     .eq('id', id);
-  if (error) { console.error(error); return; }
+  if (error) { console.error(error); showToast('something went wrong, try again', 'alert-circle'); return; }
   playChime();
+  showToast('marked as done', 'check');
   await loadAssignments();
   renderAssignments();
+}
+
+async function performRestore(id) {
+  const item = assignments.find((a) => a.id === id);
+  let newDue = item?.due_date ?? null;
+  if (newDue && new Date(newDue).getTime() <= Date.now()) {
+    newDue = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  }
+  const { error } = await supabase.from('assignments')
+    .update({ status: 'active', moved_to_history_at: null, due_date: newDue })
+    .eq('id', id);
+  if (error) { console.error(error); showToast('something went wrong, try again', 'alert-circle'); return; }
+  playChime();
+  showToast('moved back to active', 'check');
+  await loadAssignments();
+  renderAssignments();
+}
+
+/* ============================================================
+   view-detail modal (tap a card to see it clearly, image included)
+   ============================================================ */
+
+function openViewModal(kind, item) {
+  el.viewTitle.textContent = item.title;
+  el.viewMeta.innerHTML = '';
+  el.viewDesc.textContent = '';
+  el.viewImage.hidden = true;
+
+  if (kind === 'assignment') {
+    const isHistory = item.status === 'history';
+    let badgeHtml;
+    if (isHistory) {
+      badgeHtml = `<span class="pill"><i data-lucide="calendar"></i>due ${formatDue(item.due_date)}</span>`;
+    } else {
+      const state = dueBadgeState(item.due_date);
+      if (state === 'overdue') badgeHtml = `<span class="pill is-overdue"><i data-lucide="alarm-clock"></i>overdue</span>`;
+      else if (state === 'soon') badgeHtml = `<span class="pill is-soon"><i data-lucide="alarm-clock"></i>due soon</span>`;
+      else badgeHtml = `<span class="pill"><i data-lucide="calendar"></i>${formatDue(item.due_date)}</span>`;
+    }
+    el.viewMeta.innerHTML = badgeHtml;
+    el.viewDesc.textContent = item.description || '';
+  } else {
+    el.viewMeta.innerHTML = `<span class="pill is-recap"><i data-lucide="sparkles"></i>${formatShortDate(item.created_at)}</span>`;
+    el.viewDesc.textContent = item.content || '';
+  }
+
+  if (item.image_url) {
+    el.viewImage.src = item.image_url;
+    el.viewImage.hidden = false;
+  }
+
+  window.lucide?.createIcons();
+  openModal(el.modalView);
+}
+
+/* ============================================================
+   share prompt (shown once, first time Recap tab is opened)
+   ============================================================ */
+
+function maybeShowSharePrompt() {
+  if (localStorage.getItem(LS_SHARE_PROMPTED) === '1') return;
+  localStorage.setItem(LS_SHARE_PROMPTED, '1');
+  openModal(el.modalShare);
+}
+
+function bindShare() {
+  el.shareUrlBox.addEventListener('click', () => copyShareUrl());
+  el.btnShareNow.addEventListener('click', async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'poppet.', text: 'Track assignments, sched, and recaps together!', url: SHARE_URL });
+        closeAllModals();
+        return;
+      } catch (e) {
+        // cancelled or unsupported — fall through to copy
+      }
+    }
+    await copyShareUrl();
+    closeAllModals();
+  });
+}
+
+async function copyShareUrl() {
+  try {
+    await navigator.clipboard.writeText(SHARE_URL);
+    showToast('link copied', 'check');
+  } catch (e) {
+    showToast('long-press the link to copy', 'copy');
+  }
 }
 
 /* ============================================================
@@ -611,15 +741,30 @@ function renderAssignments() {
         </div>
       </div>
       <div class="item-actions">
+        ${isHistory ? `<button class="item-restore" data-action="restore" aria-label="Restore to active"><i data-lucide="rotate-ccw"></i></button>` : ''}
         <button class="item-del" data-action="delete" aria-label="Delete"><i data-lucide="trash-2"></i></button>
       </div>
     `;
 
-    li.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      askDelete({ table: 'assignments', id: a.id, label: a.title });
+    li.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      askConfirm({ type: 'delete', table: 'assignments', id: a.id, label: a.title });
     });
     const doneBtn = li.querySelector('[data-action="done"]');
-    if (doneBtn) doneBtn.addEventListener('click', () => markDone(a.id));
+    if (doneBtn) doneBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      askConfirm({ type: 'done', id: a.id, label: a.title });
+    });
+    const restoreBtn = li.querySelector('[data-action="restore"]');
+    if (restoreBtn) restoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      askConfirm({ type: 'undone', id: a.id, label: a.title });
+    });
+
+    li.addEventListener('click', (e) => {
+      if (e.target.closest('.item-check, .item-del, .item-restore')) return;
+      openViewModal('assignment', a);
+    });
 
     el.assignmentList.appendChild(li);
   });
@@ -651,8 +796,13 @@ function renderRecaps() {
         <button class="item-del" data-action="delete" aria-label="Delete"><i data-lucide="trash-2"></i></button>
       </div>
     `;
-    li.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      askDelete({ table: 'recaps', id: r.id, label: r.title });
+    li.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      askConfirm({ type: 'delete', table: 'recaps', id: r.id, label: r.title });
+    });
+    li.addEventListener('click', (e) => {
+      if (e.target.closest('.item-del')) return;
+      openViewModal('recap', r);
     });
     el.recapList.appendChild(li);
   });
@@ -708,7 +858,7 @@ function renderSchedule() {
         <button class="item-del" data-action="delete" aria-label="Delete"><i data-lucide="trash-2"></i></button>
       `;
       card.querySelector('[data-action="delete"]').addEventListener('click', () => {
-        askDelete({ table: 'schedule', id: s.id, label: s.title });
+        askConfirm({ type: 'delete', table: 'schedule', id: s.id, label: s.title });
       });
       group.appendChild(card);
     });

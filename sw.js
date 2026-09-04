@@ -8,13 +8,13 @@ const CACHE_NAME = 'poppet-shell-v1';
 const SHELL_FILES = [
   './',
   './index.html',
-  './css/style.css',
-  './js/config.js',
-  './js/sound.js',
-  './js/app.js',
+  './style.css',
+  './config.js',
+  './sound.js',
+  './app.js',
   './manifest.json',
-  './icons/icon.svg',
-  './assets/sounds/cutesounds.mp3',
+  './icon.svg',
+  './cutesounds.mp3',
 ];
 
 self.addEventListener('install', (event) => {
