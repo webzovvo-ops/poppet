@@ -1,0 +1,13 @@
+{
+  "name": "poppet.",
+  "short_name": "poppet.",
+  "description": "A cute list tracker for assignments, schedule, and recaps.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFF6F2",
+  "theme_color": "#FF8FAB",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

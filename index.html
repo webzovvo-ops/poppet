@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>poppet.</title>
+<meta name="description" content="A cute list tracker for assignments, schedule, and recaps." />
+<meta name="theme-color" content="#FF8FAB" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ============ ONBOARDING OVERLAY (sound approval, no name entry) ============ -->
+<div id="onboarding" class="onboarding">
+  <div class="onboarding-card">
+    <div class="mascot" id="mascotOnboarding" aria-hidden="true">
+      <svg viewBox="0 0 200 200" class="mascot-svg">
+        <ellipse cx="100" cy="178" rx="46" ry="8" class="mascot-shadow"/>
+        <g class="mascot-bob">
+          <circle cx="100" cy="100" r="70" class="mascot-body"/>
+          <circle cx="100" cy="100" r="70" class="mascot-body-shine"/>
+          <g class="mascot-ear mascot-ear-l"><circle cx="52" cy="46" r="20"/></g>
+          <g class="mascot-ear mascot-ear-r"><circle cx="148" cy="46" r="20"/></g>
+          <circle cx="52" cy="46" r="11" class="mascot-ear-inner"/>
+          <circle cx="148" cy="46" r="11" class="mascot-ear-inner"/>
+          <g class="mascot-eyes">
+            <ellipse cx="76" cy="102" rx="7" ry="10" class="mascot-eye"/>
+            <ellipse cx="124" cy="102" rx="7" ry="10" class="mascot-eye"/>
+          </g>
+          <circle cx="60" cy="122" r="10" class="mascot-blush"/>
+          <circle cx="140" cy="122" r="10" class="mascot-blush"/>
+          <path d="M88 128 Q100 138 112 128" class="mascot-mouth"/>
+        </g>
+      </svg>
+    </div>
+
+    <h1 class="onboarding-title">want cute<br/>notification sounds?</h1>
+    <p class="onboarding-sub">Turn them on for a cute chime whenever something's new or due. This is saved on your device, so it still works even offline.</p>
+
+    <div class="onboarding-actions">
+      <button id="btnEnableSound" class="btn btn-primary" type="button">
+        <i data-lucide="volume-2"></i>
+        <span>yes, enable</span>
+      </button>
+      <button id="btnSkipSound" class="btn btn-ghost" type="button">
+        <span>skip for now</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="app" hidden>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>poppet<span class="brand-period">.</span></h1>
+    </div>
+    <button id="btnMuteToggle" class="icon-btn" type="button" aria-label="Toggle sound" title="Sounds">
+      <i data-lucide="volume-2"></i>
+    </button>
+  </header>
+
+  <!-- ASSIGNMENT VIEW -->
+  <section id="view-assignment" class="view">
+    <div class="view-head">
+      <div class="segmented" role="tablist" aria-label="Assignment filter">
+        <button class="segment is-active" data-segment="active" type="button" role="tab" aria-selected="true">active</button>
+        <button class="segment" data-segment="history" type="button" role="tab" aria-selected="false">history</button>
+      </div>
+    </div>
+
+    <div id="assignmentEmpty" class="empty-state" hidden>
+      <i data-lucide="sparkles"></i>
+      <p>No assignments yet.<br/>Tap <strong>+</strong> to add one.</p>
+    </div>
+
+    <ul id="assignmentList" class="card-list"></ul>
+  </section>
+
+  <!-- SCHED VIEW -->
+  <section id="view-sched" class="view" hidden>
+    <div class="view-head">
+      <h2 class="view-title">sched</h2>
+    </div>
+
+    <div id="schedEmpty" class="empty-state" hidden>
+      <i data-lucide="calendar-days"></i>
+      <p>Your schedule is empty.<br/>Tap <strong>+</strong> to add a class.</p>
+    </div>
+
+    <div id="schedGroups" class="sched-groups"></div>
+  </section>
+
+  <!-- RECAP VIEW -->
+  <section id="view-recap" class="view" hidden>
+    <div class="view-head">
+      <h2 class="view-title">recap</h2>
+    </div>
+
+    <div id="recapEmpty" class="empty-state" hidden>
+      <i data-lucide="notebook-pen"></i>
+      <p>No recaps yet.<br/>Tap <strong>+</strong> to add one.</p>
+    </div>
+
+    <ul id="recapList" class="card-list"></ul>
+  </section>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav-wrap">
+    <button id="btnAdd" class="nav-add" type="button" aria-label="Add">
+      <i data-lucide="plus"></i>
+    </button>
+    <nav class="bottom-nav" data-active="assignment">
+      <button class="nav-btn is-active" data-tab="assignment" type="button">
+        <i data-lucide="clipboard-list"></i>
+        <span>assignment</span>
+      </button>
+      <button class="nav-btn" data-tab="sched" type="button">
+        <i data-lucide="calendar-days"></i>
+        <span>sched</span>
+      </button>
+      <button class="nav-btn" data-tab="recap" type="button">
+        <i data-lucide="sparkles"></i>
+        <span>recap</span>
+      </button>
+    </nav>
+  </div>
+</div>
+
+<!-- ============ ADD ASSIGNMENT MODAL ============ -->
+<div id="modalAssignment" class="modal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">new assignment</h2>
+
+    <form id="formAssignment" class="form">
+      <label class="field">
+        <span class="field-label">subject</span>
+        <select id="fAssignSubject" required></select>
+      </label>
+
+      <label class="field" id="fAssignCustomWrap" hidden>
+        <span class="field-label">custom subject</span>
+        <input type="text" id="fAssignCustomTitle" placeholder="e.g. Reflection paper" maxlength="120" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">details <em>(optional)</em></span>
+        <textarea id="fAssignDesc" placeholder="notes, instructions..." rows="3" maxlength="600"></textarea>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">date</span>
+          <input type="date" id="fAssignDueDate" required />
+        </label>
+        <label class="field">
+          <span class="field-label">time</span>
+          <input type="time" id="fAssignDueTime" required />
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">image <em>(optional)</em></span>
+        <div class="image-drop" id="assignImageDrop">
+          <input type="file" id="fAssignImage" accept="image/*" hidden />
+          <div class="image-drop-empty" id="assignImageEmpty">
+            <i data-lucide="image-plus"></i>
+            <span>tap to attach an image</span>
+          </div>
+          <img id="assignImagePreview" class="image-drop-preview" hidden alt="" />
+          <button type="button" id="assignImageRemove" class="image-remove" hidden aria-label="Remove image">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close-modal>cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveAssignment">
+          <i data-lucide="check"></i>
+          <span>save</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ ADD RECAP MODAL ============ -->
+<div id="modalRecap" class="modal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">new recap</h2>
+
+    <form id="formRecap" class="form">
+      <label class="field">
+        <span class="field-label">title</span>
+        <input type="text" id="fRecapTitle" placeholder="e.g. Chapter 3 recap" required maxlength="120" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">notes <em>(optional)</em></span>
+        <textarea id="fRecapContent" placeholder="key points, notes..." rows="4" maxlength="800"></textarea>
+      </label>
+
+      <label class="field">
+        <span class="field-label">image <em>(optional)</em></span>
+        <div class="image-drop" id="recapImageDrop">
+          <input type="file" id="fRecapImage" accept="image/*" hidden />
+          <div class="image-drop-empty" id="recapImageEmpty">
+            <i data-lucide="image-plus"></i>
+            <span>tap to attach an image</span>
+          </div>
+          <img id="recapImagePreview" class="image-drop-preview" hidden alt="" />
+          <button type="button" id="recapImageRemove" class="image-remove" hidden aria-label="Remove image">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close-modal>cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveRecap">
+          <i data-lucide="check"></i>
+          <span>save</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ ADD SCHED MODAL ============ -->
+<div id="modalSched" class="modal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">new class</h2>
+
+    <form id="formSched" class="form">
+      <label class="field">
+        <span class="field-label">subject / code <em>(optional)</em></span>
+        <input type="text" id="fSchedCode" placeholder="e.g. GE-MATH" maxlength="40" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">title</span>
+        <input type="text" id="fSchedTitle" placeholder="e.g. Mathematics in the Modern World" required maxlength="120" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">day</span>
+        <select id="fSchedDay" required>
+          <option value="" disabled selected>select a day</option>
+          <option>Monday</option>
+          <option>Tuesday</option>
+          <option>Wednesday</option>
+          <option>Thursday</option>
+          <option>Friday</option>
+          <option>Saturday</option>
+          <option>Sunday</option>
+        </select>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">start</span>
+          <input type="time" id="fSchedStart" required />
+        </label>
+        <label class="field">
+          <span class="field-label">end</span>
+          <input type="time" id="fSchedEnd" required />
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">room <em>(optional)</em></span>
+        <input type="text" id="fSchedRoom" placeholder="e.g. 301" maxlength="40" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">professor <em>(optional)</em></span>
+        <input type="text" id="fSchedProf" placeholder="e.g. Prof. Dela Cruz" maxlength="80" />
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close-modal>cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveSched">
+          <i data-lucide="check"></i>
+          <span>save</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ CONFIRM DELETE MODAL ============ -->
+<div id="modalConfirm" class="modal" hidden>
+  <div class="modal-sheet modal-sheet-sm">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title" id="confirmTitle">delete this?</h2>
+    <p class="confirm-sub" id="confirmSub">This can't be undone.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close-modal>nevermind</button>
+      <button type="button" class="btn btn-danger" id="btnConfirmDelete">
+        <i data-lucide="trash-2"></i>
+        <span>delete</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- toast -->
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script type="module" src="js/config.js"></script>
+<script type="module" src="js/sound.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
